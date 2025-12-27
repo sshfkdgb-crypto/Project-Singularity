@@ -1,72 +1,125 @@
-name: AI Repository Optimizer
+# ==============================================================================
+# ==                  Genesis Forge - The AI Engineer                         ==
+# ==             المهندس الذكي - الإصدار النهائي المتوافق                     ==
+# ==============================================================================
+#
+# هذا الـ Workflow هو "المهندس" الذي يستقبل الأوامر من تطبيق Forge Optimizer.
+# إنه مصمم ليكون مرنًا ويتكيف مع المدخلات الذكية التي يرسلها التطبيق.
+#
+# :كيف يعمل
+# 1. يُشغَّل عند وصول أمر "repository_dispatch" من التطبيق.
+# 2. يقرأ المدخلات: المستودع الهدف، التوكن، ونوع التحسين المطلوب.
+# 3. يقوم باستنساخ المستودع الهدف باستخدام التوكن الذي تم إرساله.
+# 4. ينشئ فرعًا جديدًا للعمل عليه بأمان.
+# 5. يقوم بإجراء "تحسين وهمي" (إنشاء ملف جديد كدليل على النجاح).
+# 6. يقوم بعمل commit ودفع التغييرات إلى المستودع الهدف.
+#
+# هذا هو الإصدار الأساسي الذي يثبت أن الدورة كاملة (تطبيق -> GitHub -> تعديل -> حفظ).
 
+name: '🤖 Genesis Forge - AI Engineer'
+
+# ------------------------------------------------------------------------------
+# -- déclencheur (المُشغّل)
+# ------------------------------------------------------------------------------
+# يعمل هذا الـ Workflow فقط عند إرسال طلب "repository_dispatch" إليه.
+# هذا هو ما يفعله التطبيق عند الضغط على زر "بدء التحسين الذكي".
 on:
-  workflow_dispatch:
-    inputs:
-      # تطبيقك الذكي سيرسل كل هذه المدخلات المحتملة
-      target_owner:
-        description: 'The owner of the target repository'
-        required: false
-      target_repo:
-        description: 'The name of the target repository'
-        required: false
-      target_token:
-        description: 'A token to access the target repository'
-        required: false
-      improvement_type:
-        description: 'Type of improvement (e.g., code_quality, performance, security)'
-        required: true
-      custom_command:
-        description: 'A custom detailed command for the AI'
-        required: false
+  repository_dispatch:
+    types: [code_quality, performance, error_handling, documentation, security, all]
 
+# ------------------------------------------------------------------------------
+# -- autorisations (الصلاحيات)
+# ------------------------------------------------------------------------------
+# نعطي الـ Workflow الصلاحيات اللازمة لقراءة المحتوى وكتابة التغييرات.
+permissions:
+  contents: write
+  pull-requests: write
+
+# ------------------------------------------------------------------------------
+# -- Tâches (المهام)
+# ------------------------------------------------------------------------------
 jobs:
   optimize-repository:
     runs-on: ubuntu-latest
-
-    env:
-      AI_API_KEY: ${{ secrets.AI_API_KEY }}
-      # استخدام التوكن المرسل كمدخل، أو التوكن الافتراضي
-      ADMIN_TOKEN: ${{ github.event.inputs.target_token || secrets.ADMIN_TOKEN }}
-
+    
     steps:
-      - name: 1. Log Received Inputs
+      # -------------------------
+      # -- الخطوة 1: طباعة المدخلات للتحقق
+      # -------------------------
+      - name: '📥 1. Display Received Inputs'
         run: |
-          echo "🚀 Optimization process started by Genesis Forge Pro."
-          echo "Target Owner: ${{ github.event.inputs.target_owner }}"
-          echo "Target Repo: ${{ github.event.inputs.target_repo }}"
-          echo "Improvement Type: ${{ github.event.inputs.improvement_type }}"
-          echo "Custom Command: ${{ github.event.inputs.custom_command }}"
+          echo "🚀 The AI Engineer has been activated!"
+          echo "----------------------------------------"
+          echo "🎯 Target Repository Owner: ${{ github.event.client_payload.target_owner }}"
+          echo "🎯 Target Repository Name: ${{ github.event.client_payload.target_repo }}"
+          echo "⚡ Improvement Type: ${{ github.event.client_payload.improvement_type }}"
+          echo "🔑 Target Token Provided: ${{ github.event.client_payload.target_token != '' }}"
+          echo "----------------------------------------"
 
-      - name: 2. Checkout Target Repository
-        uses: actions/checkout@v3
+      # -------------------------
+      # -- الخطوة 2: استنساخ المستودع الهدف
+      # -------------------------
+      # نستخدم التوكن الذي أرسله التطبيق للوصول إلى المستودع الهدف.
+      - name: '📂 2. Clone Target Repository'
+        uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}
-          token: ${{ env.ADMIN_TOKEN }}
-          path: './target'
+          repository: ${{ github.event.client_payload.target_owner }}/${{ github.event.client_payload.target_repo }}
+          token: ${{ github.event.client_payload.target_token }} # أهم جزء: استخدام التوكن المرسل
+          path: 'target_project' # نضع المشروع في مجلد منفصل
 
-      - name: 3. Prepare Context for AI
-        id: context
+      # -------------------------
+      # -- الخطوة 3: إعداد Git
+      # -------------------------
+      - name: '🔧 3. Configure Git'
         run: |
-          # (هنا يمكنك إضافة منطق لقراءة الملفات، الأخطاء، إلخ)
-          echo "Preparing context for AI based on improvement type: ${{ github.event.inputs.improvement_type }}"
-          # كمثال، سنقرأ ملف README
-          CONTEXT_DATA=$(cat ./target/README.md || echo "No README found.")
-          CLEAN_CONTEXT=$(echo "$CONTEXT_DATA" | awk 'NF {printf "%s\\n", $0;}' | sed 's/"/\\"/g')
-          echo "context_data=$CLEAN_CONTEXT" >> $GITHUB_OUTPUT
+          cd target_project
+          git config --global user.name 'Genesis Forge AI'
+          git config --global user.email 'ai-engineer@users.noreply.github.com'
 
-      - name: 4. Consult AI Expert
-        id: ai_consult
+      # -------------------------
+      # -- الخطوة 4: إنشاء فرع جديد للعمل
+      # -------------------------
+      - name: '🌿 4. Create a New Branch'
         run: |
-          PROMPT="You are an expert software engineer. Your task is to perform an optimization of type '${{ github.event.inputs.improvement_type }}' on the repository '${{ github.event.inputs.target_repo }}'. Here is some context from the repository:\n\n${{ steps.context.outputs.context_data }}\n\nIf there is a custom command, follow it: '${{ github.event.inputs.custom_command }}'. Provide the necessary code or documentation changes."
+          cd target_project
+          # اسم الفرع يعتمد على نوع التحسين المطلوب
+          BRANCH_NAME="forge-improvement-${{ github.event.client_payload.improvement_type }}-$(date +%s)"
+          git checkout -b $BRANCH_NAME
+          echo "✅ Created and switched to branch: $BRANCH_NAME"
+
+      # -------------------------
+      # -- الخطوة 5: إجراء التحسين (إنشاء ملف كدليل)
+      # -------------------------
+      # هذه هي الخطوة التي سيتم فيها استدعاء الذكاء الاصطناعي لاحقًا.
+      # حاليًا، سنقوم فقط بإنشاء ملف لإثبات أننا نستطيع التعديل على المستودع.
+      - name: '✨ 5. Perform Code Improvement (Simulation)'
+        run: |
+          cd target_project
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          IMPROVEMENT_TYPE="${{ github.event.client_payload.improvement_type }}"
           
-          # (منطق استدعاء AI API هنا)
-          echo "AI would now process this prompt and suggest changes..."
-          # كمثال، سنقوم فقط بطباعة الأمر
-          echo "ai_suggestion=AI suggests refactoring the main class for better readability." >> $GITHUB_OUTPUT
+          # إنشاء ملف جديد يحتوي على تفاصيل التحسين
+          echo "## 🤖 AI Improvement Report" > AI_IMPROVEMENT_REPORT.md
+          echo "" >> AI_IMPROVEMENT_REPORT.md
+          echo "**Timestamp:** $TIMESTAMP" >> AI_IMPROVEMENT_REPORT.md
+          echo "**Improvement Type:** $IMPROVEMENT_TYPE" >> AI_IMPROVEMENT_REPORT.md
+          echo "" >> AI_IMPROVEMENT_REPORT.md
+          echo "This file was automatically generated by the Genesis Forge AI Engineer." >> AI_IMPROVEMENT_REPORT.md
+          echo "This proves that the AI has successfully accessed and modified the repository." >> AI_IMPROVEMENT_REPORT.md
+          echo "" >> AI_IMPROVEMENT_REPORT.md
+          echo "Next step: Integrate a real AI model to modify actual code files." >> AI_IMPROVEMENT_REPORT.md
+          
+          echo "✅ Created AI_IMPROVEMENT_REPORT.md"
 
-      - name: 5. Create Pull Request with AI Suggestion
+      # -------------------------
+      # -- الخطوة 6: حفظ ودفع التغييرات
+      # -------------------------
+      - name: '📤 6. Commit and Push Changes'
         run: |
-          # (هنا يمكنك إضافة منطق لتطبيق التغييرات وإنشاء PR)
-          echo "Creating a Pull Request with the suggestion: ${{ steps.ai_consult.outputs.ai_suggestion }}"
-          # (استخدام peter-evans/create-pull-request)
+          cd target_project
+          git add .
+          git commit -m "feat(ai): Perform automatic improvement for ${{ github.event.client_payload.improvement_type }}"
+          git push origin HEAD
+          echo "✅✅✅ Successfully pushed changes to the target repository!"
+          echo "🎉 The optimization cycle is complete and successful!"
+
