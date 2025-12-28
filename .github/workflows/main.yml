@@ -72,17 +72,22 @@ jobs:
 
           # --- دالة استدعاء المحرك ---
           def call_ai_engine(model, messages):
-              # ✅✅✅ تم تبسيط الكود ليدعم OpenRouter فقط حاليًا ✅✅✅
               if engine != 'openrouter':
                   print(f"Error: This script currently only supports 'openrouter'. You selected '{engine}'.")
                   return None
 
               print("Using OpenRouter...")
               api_url = "https://openrouter.ai/api/v1/chat/completions"
+              
+              # ✅✅✅ هذا هو السطر الذي تم تصحيحه ✅✅✅
+              # إضافة الرؤوس المطلوبة من قبل OpenRouter
               headers = {
                   "Authorization": f"Bearer {api_key}",
-                  "Content-Type": "application/json"
+                  "Content-Type": "application/json",
+                  "HTTP-Referer": f"https://github.com/{target_owner}/{target_repo}", # أي رابط مقبول
+                  "X-Title": "The Forge AI Engineer" # اسم وصفي لمشروعك
               }
+              
               data = {
                   "model": model,
                   "messages": messages
@@ -120,7 +125,6 @@ jobs:
               print("✅ Script finished successfully.")
           else:
               print("\n❌ Script failed to get a response from the AI.")
-              # الخروج بكود خطأ لإظهار فشل المهمة في واجهة GitHub
               exit(1)
 
           EOF
