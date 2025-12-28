@@ -65,7 +65,6 @@ jobs:
           target_owner = os.getenv('TARGET_OWNER')
           target_repo = os.getenv('TARGET_REPO')
           prompt = os.getenv('USER_PROMPT')
-          github_token = os.getenv('GITHUB_TOKEN')
 
           print(f"--- Starting AI Engineer Script ---")
           print(f"Engine: {engine}")
@@ -73,55 +72,40 @@ jobs:
 
           # --- دالة استدعاء المحرك ---
           def call_ai_engine(model, messages):
-              headers = {}
-              api_url = ""
-              data = {}
+              # ✅✅✅ تم تبسيط الكود ليدعم OpenRouter فقط حاليًا ✅✅✅
+              if engine != 'openrouter':
+                  print(f"Error: This script currently only supports 'openrouter'. You selected '{engine}'.")
+                  return None
+
+              print("Using OpenRouter...")
+              api_url = "https://openrouter.ai/api/v1/chat/completions"
+              headers = {
+                  "Authorization": f"Bearer {api_key}",
+                  "Content-Type": "application/json"
+              }
+              data = {
+                  "model": model,
+                  "messages": messages
+              }
 
               try:
-                  if engine == 'openrouter':
-                      print("Using OpenRouter...")
-                      api_url = "https://openrouter.ai/api/v1/chat/completions"
-                      headers = {
-                          "Authorization": f"Bearer {api_key}",
-                          "Content-Type": "application/json"
-                      }
-                      data = {
-                          "model": model,
-                          "messages": messages
-                      }
-                  elif engine == 'gemini':
-                      print("Using Google Gemini...")
-                      api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                      headers = {"Content-Type": "application/json"}
-                      # ✅✅✅ هذا هو السطر الذي تم تصحيحه ✅✅✅
-                      # بناء الجسم الخاص بـ Gemini بشكل صحيح
-                      gemini_messages = [{"role": "user", "parts": [{"text": m["content"]}] for m in messages if m["role"] == "user"}]
-                      data = {"contents": gemini_messages}
-                  else:
-                      print(f"Error: Unknown engine '{engine}'")
-                      return None
-
                   response = requests.post(api_url, headers=headers, data=json.dumps(data))
                   response.raise_for_status()
-                  
                   print("AI response received successfully.")
-                  
-                  if engine == 'openrouter':
-                      return response.json()['choices'][0]['message']['content']
-                  elif engine == 'gemini':
-                      return response.json()['candidates'][0]['content']['parts'][0]['text']
+                  return response.json()['choices'][0]['message']['content']
 
               except requests.exceptions.RequestException as e:
                   print(f"Error calling AI API: {e}")
-                  print(f"Response Body: {e.response.text if e.response else 'No response'}")
+                  if e.response:
+                      print(f"Status Code: {e.response.status_code}")
+                      print(f"Response Body: {e.response.text}")
                   return None
 
           # --- المهمة الرئيسية ---
           print("\n--- Phase 1: Simple AI Task ---")
           print("Task: Ask the AI to introduce itself based on the prompt.")
 
-          model_name = "deepseek/deepseek-coder" if engine == 'openrouter' else "gemini-1.5-flash-latest"
-
+          model_name = "deepseek/deepseek-coder"
           message_list = [
               {"role": "system", "content": "You are an expert AI software engineer. Your task is to analyze user requests and provide code or explanations."},
               {"role": "user", "content": f"Based on this user command: '{prompt}', briefly introduce what you are about to do."}
@@ -136,6 +120,8 @@ jobs:
               print("✅ Script finished successfully.")
           else:
               print("\n❌ Script failed to get a response from the AI.")
+              # الخروج بكود خطأ لإظهار فشل المهمة في واجهة GitHub
+              exit(1)
 
           EOF
 
