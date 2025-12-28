@@ -1,102 +1,184 @@
-# اسم سير العمل الذي سيظهر في واجهة GitHub Actions
-name: The Wise Engineer (The Forge)
+name: 'The Forge - AI Engineer'
 
 # ===================================================================
-#  المُشغّلات (Triggers) - هذا هو الجزء الأهم الذي يحل مشكلة 422
+# 1. TRIGGER: كيف يتم تشغيل هذا السير العملي
 # ===================================================================
+# هذا السير العملي يتم تشغيله فقط عند استدعائه عبر الـ API
+# (من تطبيق Forge Optimizer)
 on:
-  # هذا السطر يسمح بتشغيل سير العمل يدويًا عبر الـ API (من تطبيقك)
   workflow_dispatch:
-    # هنا نُعرّف المدخلات (Inputs) التي نتوقعها من التطبيق
     inputs:
+      # المدخلات التي يرسلها التطبيق
+      engine_choice:
+        description: 'The AI engine to use (gemini or openrouter)'
+        required: true
+        type: string
+      user_ai_api_key:
+        description: 'The user-provided API key for the selected AI engine'
+        required: true
+        type: string
       target_owner:
-        description: 'مالك المستودع الهدف الذي سيتم تحسينه'
+        description: 'The owner of the target repository'
         required: true
+        type: string
       target_repo:
-        description: 'اسم المستودع الهدف الذي سيتم تحسينه'
+        description: 'The name of the target repository'
         required: true
-      improvement_focus:
-        description: 'نوع التحسين المطلوب (مثال: code_quality, documentation)'
-        required: false
-        default: 'all' # قيمة افتراضية إذا لم يرسل التطبيق شيئًا
+        type: string
+      prompt:
+        description: 'The user-defined prompt for the AI engineer'
+        required: true
+        type: string
 
 # ===================================================================
-#  المهام (Jobs) - الخطوات التي سينفذها المهندس
+# 2. JOBS: المهام التي سيتم تنفيذها
 # ===================================================================
 jobs:
-  # اسم المهمة الرئيسية
-  analyze-and-improve:
-    # نوع النظام الذي ستعمل عليه المهمة (أحدث إصدار من أوبونتو)
+  ai_engineer_job:
+    # اسم المهمة التي ستظهر في واجهة GitHub Actions
+    name: '🤖 AI Engineer is thinking...'
+    
+    # نوع الخادم الذي ستعمل عليه المهمة
     runs-on: ubuntu-latest
 
-    # الخطوات التنفيذية للمهمة
+    # ===============================================================
+    # 3. STEPS: الخطوات التنفيذية للمهمة
+    # ===============================================================
     steps:
       # ---------------------------------------------------------------
-      # الخطوة 1: سحب كود "المهندس" نفسه (هذا المستودع)
+      # الخطوة 1: تسجيل المدخلات (للتأكد من أن كل شيء وصل بشكل صحيح)
       # ---------------------------------------------------------------
-      - name: 1. Checkout The Forge Code
-        uses: actions/checkout@v4
-        with:
-          # نسحب كود المستودع الحالي الذي يحتوي على هذا الملف
-          repository: ${{ github.repository }}
+      - name: '📥 1. Receiving instructions from The Forge App'
+        run: |
+          echo "✅ Instructions received successfully."
+          echo "🧠 AI Engine selected: ${{ github.event.inputs.engine_choice }}"
+          echo "🎯 Target repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}"
+          echo "⚡ User prompt: ${{ github.event.inputs.prompt }}"
 
       # ---------------------------------------------------------------
-      # الخطوة 2: سحب كود "الهدف" (المستودع الذي نريد تحسينه)
+      # الخطوة 2: إعداد بيئة العمل (تثبيت Python)
       # ---------------------------------------------------------------
-      - name: 2. Checkout Target Repository Code
-        uses: actions/checkout@v4
-        with:
-          # نستخدم المدخلات التي أرسلها التطبيق لتحديد المستودع الهدف
-          repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}
-          # نضع كود الهدف في مجلد منفصل اسمه 'target' لتجنب تداخل الملفات
-          path: 'target'
-
-      # ---------------------------------------------------------------
-      # الخطوة 3: إعداد بيئة عمل بايثون
-      # ---------------------------------------------------------------
-      - name: 3. Setup Python Environment
+      - name: '🛠️ 2. Setting up the environment'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # يمكنك تغيير إصدار بايثون حسب الحاجة
+          python-version: '3.11' # استخدام نسخة حديثة من بايثون
 
       # ---------------------------------------------------------------
-      # الخطوة 4: تثبيت المكتبات المطلوبة (مثل مكتبة OpenAI)
+      # الخطوة 3: تثبيت المكتبات المطلوبة
       # ---------------------------------------------------------------
-      - name: 4. Install Dependencies
+      - name: '📦 3. Installing necessary libraries'
         run: |
-          python -m pip install --upgrade pip
-          pip install openai # تثبيت مكتبة OpenAI لتحليل الكود
+          pip install requests # مكتبة لإجراء طلبات HTTP
+          # يمكنك إضافة مكتبات أخرى هنا في المستقبل مثل PyGithub
 
       # ---------------------------------------------------------------
-      # الخطوة 5: تشغيل السكربت الذكي (جوهر عمل المهندس)
+      # الخطوة 4: كتابة وتشغيل السكربت الذكي
       # ---------------------------------------------------------------
-      - name: 5. Run The Wise Engineer Script
+      - name: '🚀 4. Running the Smart Script'
         env:
-          # تمرير مفتاح API الخاص بـ OpenAI كمتغير بيئة آمن
-          # يجب عليك إضافته في إعدادات المستودع -> Secrets and variables -> Actions
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # تمرير مسار مجلد الهدف للسكربت
-          TARGET_DIR: 'target'
-          # تمرير نوع التحسين المطلوب
-          IMPROVEMENT_FOCUS: ${{ github.event.inputs.improvement_focus }}
+          # تمرير المدخلات كمتغيرات بيئة (Environment Variables) للسكربت
+          ENGINE_CHOICE: ${{ github.event.inputs.engine_choice }}
+          AI_API_KEY: ${{ github.event.inputs.user_ai_api_key }}
+          TARGET_OWNER: ${{ github.event.inputs.target_owner }}
+          TARGET_REPO: ${{ github.event.inputs.target_repo }}
+          USER_PROMPT: ${{ github.event.inputs.prompt }}
+          # سنحتاج أيضًا إلى توكن GitHub للوصول إلى المستودع الهدف
+          # نستخدم التوكن المدمج في GitHub Actions للبداية
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "=============================================="
-          echo "🚀 The Wise Engineer is starting its task..."
-          echo "=============================================="
-          echo "🎯 Analyzing repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}"
-          echo "⚡ Improvement focus: ${{ github.event.inputs.improvement_focus }}"
-          echo "📂 Target code is located in: $(pwd)/target"
-          
-          # -----------------------------------------------------------------
-          # هنا تضع الأمر لتشغيل سكربت البايثون الخاص بك لتحليل الكود
-          # مثال: python engineer_script.py
-          # -----------------------------------------------------------------
-          
-          # كمثال بسيط، سنقوم فقط بعرض قائمة الملفات في المستودع الهدف
-          echo "Listing files in the target repository:"
-          ls -R target
-          
-          echo "=============================================="
-          echo "✅ The Wise Engineer has finished the analysis."
-          echo "=============================================="
+          # كتابة سكربت بايثون ديناميكيًا
+          cat << 'EOF' > engineer_script.py
+          import os
+          import requests
+          import json
 
+          # --- قراءة المتغيرات من بيئة العمل ---
+          engine = os.getenv('ENGINE_CHOICE')
+          api_key = os.getenv('AI_API_KEY')
+          target_owner = os.getenv('TARGET_OWNER')
+          target_repo = os.getenv('TARGET_REPO')
+          prompt = os.getenv('USER_PROMPT')
+          github_token = os.getenv('GITHUB_TOKEN')
+
+          print(f"--- Starting AI Engineer Script ---")
+          print(f"Engine: {engine}")
+          print(f"Target: {target_owner}/{target_repo}")
+
+          # --- دالة لإجراء استدعاءات الـ API ---
+          def call_ai_engine(model, messages):
+              headers = {"Authorization": f"Bearer {api_key}"}
+              api_url = ""
+              
+              if engine == 'openrouter':
+                  print("Using OpenRouter...")
+                  api_url = "https://openrouter.ai/api/v1/chat/completions"
+                  headers["Content-Type"] = "application/json"
+                  data = {
+                      "model": model,
+                      "messages": messages
+                  }
+              elif engine == 'gemini':
+                  print("Using Google Gemini...")
+                  # ملاحظة: كود Gemini API يختلف قليلاً، هذا مثال مبسط
+                  # ستحتاج إلى مكتبة google-generativeai لتفعيله بالكامل
+                  api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                  headers = {"Content-Type": "application/json"}
+                  # بناء الجسم الخاص بـ Gemini
+                  gemini_messages = [{"role": "user", "parts": [{"text": m["content"]}] for m in messages}]
+                  data = {"contents": gemini_messages}
+              else:
+                  print(f"Error: Unknown engine '{engine}'")
+                  return None
+
+              try:
+                  response = requests.post(api_url, headers=headers, data=json.dumps(data))
+                  response.raise_for_status() # يطلق استثناء لأكواد الخطأ (4xx, 5xx)
+                  
+                  print("AI response received successfully.")
+                  # استخلاص النص يختلف بين الـ APIs
+                  if engine == 'openrouter':
+                      return response.json()['choices'][0]['message']['content']
+                  elif engine == 'gemini':
+                      return response.json()['candidates'][0]['content']['parts'][0]['text']
+
+              except requests.exceptions.RequestException as e:
+                  print(f"Error calling AI API: {e}")
+                  print(f"Response Body: {e.response.text if e.response else 'No response'}")
+                  return None
+
+          # --- المهمة الرئيسية (مثال مبسط) ---
+          # في المستقبل، هذه المهمة ستقوم بـ:
+          # 1. استنساخ المستودع الهدف.
+          # 2. قراءة محتويات الملفات.
+          # 3. بناء برومبت مفصل.
+          # 4. استدعاء الذكاء الاصطناعي.
+          # 5. تطبيق التغييرات.
+          # 6. إنشاء Pull Request.
+
+          print("\n--- Phase 1: Simple AI Task ---")
+          print("Task: Ask the AI to introduce itself based on the prompt.")
+
+          # اختيار النموذج بناءً على المحرك
+          model_name = "deepseek/deepseek-coder" if engine == 'openrouter' else "gemini-1.5-flash-latest"
+
+          # بناء الرسائل للـ AI
+          message_list = [
+              {"role": "system", "content": "You are an expert AI software engineer. Your task is to analyze user requests and provide code or explanations."},
+              {"role": "user", "content": f"Based on this user command: '{prompt}', briefly introduce what you are about to do."}
+          ]
+
+          # استدعاء المحرك
+          ai_response = call_ai_engine(model=model_name, messages=message_list)
+
+          if ai_response:
+              print("\n--- AI Introduction ---")
+              print(ai_response)
+              print("-----------------------\n")
+              print("✅ Script finished successfully.")
+          else:
+              print("\n❌ Script failed to get a response from the AI.")
+
+          EOF
+
+          # تشغيل السكربت الذي تم إنشاؤه
+          python engineer_script.py
