@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       engine_choice:
-        description: 'The AI engine to use (gemini or openrouter)'
+        description: 'The AI engine to use'
         required: true
         type: string
       user_ai_api_key:
-        description: 'The user-provided API key for the selected AI engine'
+        description: 'The API key for the selected AI engine'
         required: true
         type: string
       target_owner:
@@ -26,26 +26,44 @@ on:
 
 jobs:
   ai_engineer_job:
-    name: '🤖 AI Engineer is thinking...'
+    name: '🤖 AI Engineer is working...'
     runs-on: ubuntu-latest
     steps:
-      - name: '📥 1. Receiving instructions from The Forge App'
+      # ---------------------------------------------------------------
+      # الخطوة 1: استلام التعليمات
+      # ---------------------------------------------------------------
+      - name: '📥 1. Receiving instructions'
         run: |
-          echo "✅ Instructions received successfully."
-          echo "🧠 AI Engine selected: ${{ github.event.inputs.engine_choice }}"
-          echo "🎯 Target repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}"
-          echo "⚡ User prompt: ${{ github.event.inputs.prompt }}"
+          echo "✅ Instructions received."
+          echo "🧠 AI Engine: ${{ github.event.inputs.engine_choice }}"
+          echo "🎯 Target: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}"
+          echo "⚡ Prompt: ${{ github.event.inputs.prompt }}"
 
-      - name: '🛠️ 2. Setting up the environment'
+      # ---------------------------------------------------------------
+      # الخطوة 2: استنساخ المستودع الهدف
+      # ---------------------------------------------------------------
+      - name: '📂 2. Cloning target repository'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}
+          path: 'target_repo' # استنساخ في مجلد فرعي
+          token: ${{ secrets.GITHUB_TOKEN }} # استخدام توكن GitHub للوصول للمستودعات
+
+      # ---------------------------------------------------------------
+      # الخطوة 3: إعداد بيئة بايثون
+      # ---------------------------------------------------------------
+      - name: '🐍 3. Setting up Python environment'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: '📦 3. Installing necessary libraries'
-        run: |
-          pip install requests
+      - name: '📦 Installing libraries'
+        run: pip install requests
 
-      - name: '🚀 4. Running the Smart Script'
+      # ---------------------------------------------------------------
+      # الخطوة 4: تشغيل السكربت الذكي (النسخة المطورة)
+      # ---------------------------------------------------------------
+      - name: '🚀 4. Running The Smart Script (Create File Task)'
         env:
           ENGINE_CHOICE: ${{ github.event.inputs.engine_choice }}
           AI_API_KEY: ${{ github.event.inputs.user_ai_api_key }}
@@ -58,74 +76,115 @@ jobs:
           import os
           import requests
           import json
+          import re
+          import subprocess
 
           # --- قراءة المتغيرات ---
-          engine = os.getenv('ENGINE_CHOICE')
           api_key = os.getenv('AI_API_KEY')
-          target_owner = os.getenv('TARGET_OWNER')
-          target_repo = os.getenv('TARGET_REPO')
           prompt = os.getenv('USER_PROMPT')
+          target_repo_path = 'target_repo'
 
-          print(f"--- Starting AI Engineer Script ---")
-          print(f"Engine: {engine}")
-          print(f"Target: {target_owner}/{target_repo}")
+          print("--- Starting AI Engineer Script (Create File Task) ---")
 
-          # --- دالة استدعاء المحرك ---
-          def call_ai_engine(model, messages):
-              if engine != 'openrouter':
-                  print(f"Error: This script currently only supports 'openrouter'. You selected '{engine}'.")
-                  return None
-
-              print("Using OpenRouter...")
-              api_url = "https://openrouter.ai/api/v1/chat/completions"
-              
-              # ✅✅✅ هذا هو السطر الذي تم تصحيحه ✅✅✅
-              # إضافة الرؤوس المطلوبة من قبل OpenRouter
-              headers = {
-                  "Authorization": f"Bearer {api_key}",
-                  "Content-Type": "application/json",
-                  "HTTP-Referer": f"https://github.com/{target_owner}/{target_repo}", # أي رابط مقبول
-                  "X-Title": "The Forge AI Engineer" # اسم وصفي لمشروعك
-              }
-              
-              data = {
-                  "model": model,
-                  "messages": messages
-              }
-
+          # --- دالة لاستدعاء OpenRouter ---
+          def call_openrouter(model, messages):
+              print("Calling OpenRouter...")
               try:
-                  response = requests.post(api_url, headers=headers, data=json.dumps(data))
+                  response = requests.post(
+                      url="https://openrouter.ai/api/v1/chat/completions",
+                      headers={
+                          "Authorization": f"Bearer {api_key}",
+                          "Content-Type": "application/json",
+                          "HTTP-Referer": "https://github.com/sshfkdgb-crypto/Project-Singularity",
+                          "X-Title": "The Forge AI Engineer"
+                      },
+                      data=json.dumps({"model": model, "messages": messages})
+                  )
                   response.raise_for_status()
-                  print("AI response received successfully.")
+                  print("AI response received.")
                   return response.json()['choices'][0]['message']['content']
-
               except requests.exceptions.RequestException as e:
                   print(f"Error calling AI API: {e}")
                   if e.response:
-                      print(f"Status Code: {e.response.status_code}")
-                      print(f"Response Body: {e.response.text}")
+                      print(f"Status Code: {e.response.status_code}, Body: {e.response.text}")
                   return None
 
           # --- المهمة الرئيسية ---
-          print("\n--- Phase 1: Simple AI Task ---")
-          print("Task: Ask the AI to introduce itself based on the prompt.")
+          # 1. تحليل البرومبت لاستخراج اسم الملف والمحتوى
+          print("\n--- Phase 1: Understanding the request ---")
+          analysis_prompt = f"""
+          Analyze the following user request and extract two pieces of information in JSON format:
+          1. 'filename': The name of the file to be created (e.g., 'README.md', 'config.json', 'src/utils.js').
+          2. 'content_prompt': A clear and direct prompt for another AI to generate the content of that file.
 
-          model_name = "deepseek/deepseek-coder"
-          message_list = [
-              {"role": "system", "content": "You are an expert AI software engineer. Your task is to analyze user requests and provide code or explanations."},
-              {"role": "user", "content": f"Based on this user command: '{prompt}', briefly introduce what you are about to do."}
-          ]
+          User Request: "{prompt}"
 
-          ai_response = call_ai_engine(model=model_name, messages=message_list)
+          Example:
+          User Request: "Create a README.md file that describes the project."
+          JSON Output: {{"filename": "README.md", "content_prompt": "Generate the full markdown content for a README.md file that describes a project called 'AI-APP-FACTORY'."}}
+          
+          Now, analyze the user request above and provide only the JSON output.
+          """
+          
+          analysis_messages = [{"role": "user", "content": analysis_prompt}]
+          analysis_response = call_openrouter(model="deepseek/deepseek-coder", messages=analysis_messages)
 
-          if ai_response:
-              print("\n--- AI Introduction ---")
-              print(ai_response)
-              print("-----------------------\n")
-              print("✅ Script finished successfully.")
-          else:
-              print("\n❌ Script failed to get a response from the AI.")
+          if not analysis_response:
+              print("❌ Failed to analyze the prompt. Exiting.")
               exit(1)
+
+          try:
+              # استخراج JSON من استجابة الـ AI
+              json_str = re.search(r'\{.*\}', analysis_response, re.DOTALL).group()
+              task_details = json.loads(json_str)
+              filename = task_details['filename']
+              content_prompt = task_details['content_prompt']
+              print(f"AI decided to create file: '{filename}'")
+          except (AttributeError, json.JSONDecodeError) as e:
+              print(f"❌ Could not parse JSON from AI analysis: {e}")
+              print(f"Raw response was: {analysis_response}")
+              exit(1)
+
+          # 2. توليد محتوى الملف
+          print("\n--- Phase 2: Generating file content ---")
+          content_messages = [
+              {"role": "system", "content": "You are a file content generator. You only output the raw text/code for the requested file, without any explanations or pleasantries."},
+              {"role": "user", "content": content_prompt}
+          ]
+          file_content = call_openrouter(model="deepseek/deepseek-coder", messages=content_messages)
+
+          if not file_content:
+              print("❌ Failed to generate file content. Exiting.")
+              exit(1)
+
+          # 3. كتابة الملف
+          print(f"\n--- Phase 3: Writing file '{filename}' ---")
+          file_path = os.path.join(target_repo_path, filename)
+          os.makedirs(os.path.dirname(file_path), exist_ok=True) # إنشاء المجلدات إذا لم تكن موجودة
+          with open(file_path, 'w', encoding='utf-8') as f:
+              f.write(file_content)
+          print("File written successfully.")
+
+          # 4. إعداد Git وإنشاء Pull Request (خطوات مبسطة)
+          print("\n--- Phase 4: Creating Pull Request ---")
+          try:
+              branch_name = f"ai-engineer/create-{filename.replace('.', '-')}"
+              subprocess.run(['git', 'config', '--global', 'user.name', 'The Forge AI'], cwd=target_repo_path, check=True)
+              subprocess.run(['git', 'config', '--global', 'user.email', 'ai-forge@example.com'], cwd=target_repo_path, check=True)
+              subprocess.run(['git', 'checkout', '-b', branch_name], cwd=target_repo_path, check=True)
+              subprocess.run(['git', 'add', '.'], cwd=target_repo_path, check=True)
+              subprocess.run(['git', 'commit', '-m', f"feat: Create {filename} as requested"], cwd=target_repo_path, check=True)
+              # ملاحظة: أمر push يتطلب توكن بصلاحيات كتابة. التوكن المدمج قد لا يكفي.
+              # subprocess.run(['git', 'push', 'origin', branch_name], cwd=target_repo_path, check=True)
+              print("✅ Git commit created successfully on new branch.")
+              print(f"Next step would be to push the branch '{branch_name}' and create a Pull Request.")
+              print("For now, the changes exist only in this runner.")
+
+          except subprocess.CalledProcessError as e:
+              print(f"❌ Git operation failed: {e}")
+              exit(1)
+
+          print("\n✅✅✅ AI Engineer task completed successfully! ✅✅✅")
 
           EOF
 
