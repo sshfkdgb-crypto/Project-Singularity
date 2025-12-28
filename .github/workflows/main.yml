@@ -1,14 +1,8 @@
 name: 'The Forge - AI Engineer'
 
-# ===================================================================
-# 1. TRIGGER: كيف يتم تشغيل هذا السير العملي
-# ===================================================================
-# هذا السير العملي يتم تشغيله فقط عند استدعائه عبر الـ API
-# (من تطبيق Forge Optimizer)
 on:
   workflow_dispatch:
     inputs:
-      # المدخلات التي يرسلها التطبيق
       engine_choice:
         description: 'The AI engine to use (gemini or openrouter)'
         required: true
@@ -30,24 +24,11 @@ on:
         required: true
         type: string
 
-# ===================================================================
-# 2. JOBS: المهام التي سيتم تنفيذها
-# ===================================================================
 jobs:
   ai_engineer_job:
-    # اسم المهمة التي ستظهر في واجهة GitHub Actions
     name: '🤖 AI Engineer is thinking...'
-    
-    # نوع الخادم الذي ستعمل عليه المهمة
     runs-on: ubuntu-latest
-
-    # ===============================================================
-    # 3. STEPS: الخطوات التنفيذية للمهمة
-    # ===============================================================
     steps:
-      # ---------------------------------------------------------------
-      # الخطوة 1: تسجيل المدخلات (للتأكد من أن كل شيء وصل بشكل صحيح)
-      # ---------------------------------------------------------------
       - name: '📥 1. Receiving instructions from The Forge App'
         run: |
           echo "✅ Instructions received successfully."
@@ -55,44 +36,30 @@ jobs:
           echo "🎯 Target repository: ${{ github.event.inputs.target_owner }}/${{ github.event.inputs.target_repo }}"
           echo "⚡ User prompt: ${{ github.event.inputs.prompt }}"
 
-      # ---------------------------------------------------------------
-      # الخطوة 2: إعداد بيئة العمل (تثبيت Python)
-      # ---------------------------------------------------------------
       - name: '🛠️ 2. Setting up the environment'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # استخدام نسخة حديثة من بايثون
+          python-version: '3.11'
 
-      # ---------------------------------------------------------------
-      # الخطوة 3: تثبيت المكتبات المطلوبة
-      # ---------------------------------------------------------------
       - name: '📦 3. Installing necessary libraries'
         run: |
-          pip install requests # مكتبة لإجراء طلبات HTTP
-          # يمكنك إضافة مكتبات أخرى هنا في المستقبل مثل PyGithub
+          pip install requests
 
-      # ---------------------------------------------------------------
-      # الخطوة 4: كتابة وتشغيل السكربت الذكي
-      # ---------------------------------------------------------------
       - name: '🚀 4. Running the Smart Script'
         env:
-          # تمرير المدخلات كمتغيرات بيئة (Environment Variables) للسكربت
           ENGINE_CHOICE: ${{ github.event.inputs.engine_choice }}
           AI_API_KEY: ${{ github.event.inputs.user_ai_api_key }}
           TARGET_OWNER: ${{ github.event.inputs.target_owner }}
           TARGET_REPO: ${{ github.event.inputs.target_repo }}
           USER_PROMPT: ${{ github.event.inputs.prompt }}
-          # سنحتاج أيضًا إلى توكن GitHub للوصول إلى المستودع الهدف
-          # نستخدم التوكن المدمج في GitHub Actions للبداية
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # كتابة سكربت بايثون ديناميكيًا
           cat << 'EOF' > engineer_script.py
           import os
           import requests
           import json
 
-          # --- قراءة المتغيرات من بيئة العمل ---
+          # --- قراءة المتغيرات ---
           engine = os.getenv('ENGINE_CHOICE')
           api_key = os.getenv('AI_API_KEY')
           target_owner = os.getenv('TARGET_OWNER')
@@ -104,38 +71,41 @@ jobs:
           print(f"Engine: {engine}")
           print(f"Target: {target_owner}/{target_repo}")
 
-          # --- دالة لإجراء استدعاءات الـ API ---
+          # --- دالة استدعاء المحرك ---
           def call_ai_engine(model, messages):
-              headers = {"Authorization": f"Bearer {api_key}"}
+              headers = {}
               api_url = ""
-              
-              if engine == 'openrouter':
-                  print("Using OpenRouter...")
-                  api_url = "https://openrouter.ai/api/v1/chat/completions"
-                  headers["Content-Type"] = "application/json"
-                  data = {
-                      "model": model,
-                      "messages": messages
-                  }
-              elif engine == 'gemini':
-                  print("Using Google Gemini...")
-                  # ملاحظة: كود Gemini API يختلف قليلاً، هذا مثال مبسط
-                  # ستحتاج إلى مكتبة google-generativeai لتفعيله بالكامل
-                  api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-                  headers = {"Content-Type": "application/json"}
-                  # بناء الجسم الخاص بـ Gemini
-                  gemini_messages = [{"role": "user", "parts": [{"text": m["content"]}] for m in messages}]
-                  data = {"contents": gemini_messages}
-              else:
-                  print(f"Error: Unknown engine '{engine}'")
-                  return None
+              data = {}
 
               try:
+                  if engine == 'openrouter':
+                      print("Using OpenRouter...")
+                      api_url = "https://openrouter.ai/api/v1/chat/completions"
+                      headers = {
+                          "Authorization": f"Bearer {api_key}",
+                          "Content-Type": "application/json"
+                      }
+                      data = {
+                          "model": model,
+                          "messages": messages
+                      }
+                  elif engine == 'gemini':
+                      print("Using Google Gemini...")
+                      api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                      headers = {"Content-Type": "application/json"}
+                      # ✅✅✅ هذا هو السطر الذي تم تصحيحه ✅✅✅
+                      # بناء الجسم الخاص بـ Gemini بشكل صحيح
+                      gemini_messages = [{"role": "user", "parts": [{"text": m["content"]}] for m in messages if m["role"] == "user"}]
+                      data = {"contents": gemini_messages}
+                  else:
+                      print(f"Error: Unknown engine '{engine}'")
+                      return None
+
                   response = requests.post(api_url, headers=headers, data=json.dumps(data))
-                  response.raise_for_status() # يطلق استثناء لأكواد الخطأ (4xx, 5xx)
+                  response.raise_for_status()
                   
                   print("AI response received successfully.")
-                  # استخلاص النص يختلف بين الـ APIs
+                  
                   if engine == 'openrouter':
                       return response.json()['choices'][0]['message']['content']
                   elif engine == 'gemini':
@@ -146,28 +116,17 @@ jobs:
                   print(f"Response Body: {e.response.text if e.response else 'No response'}")
                   return None
 
-          # --- المهمة الرئيسية (مثال مبسط) ---
-          # في المستقبل، هذه المهمة ستقوم بـ:
-          # 1. استنساخ المستودع الهدف.
-          # 2. قراءة محتويات الملفات.
-          # 3. بناء برومبت مفصل.
-          # 4. استدعاء الذكاء الاصطناعي.
-          # 5. تطبيق التغييرات.
-          # 6. إنشاء Pull Request.
-
+          # --- المهمة الرئيسية ---
           print("\n--- Phase 1: Simple AI Task ---")
           print("Task: Ask the AI to introduce itself based on the prompt.")
 
-          # اختيار النموذج بناءً على المحرك
           model_name = "deepseek/deepseek-coder" if engine == 'openrouter' else "gemini-1.5-flash-latest"
 
-          # بناء الرسائل للـ AI
           message_list = [
               {"role": "system", "content": "You are an expert AI software engineer. Your task is to analyze user requests and provide code or explanations."},
               {"role": "user", "content": f"Based on this user command: '{prompt}', briefly introduce what you are about to do."}
           ]
 
-          # استدعاء المحرك
           ai_response = call_ai_engine(model=model_name, messages=message_list)
 
           if ai_response:
@@ -180,5 +139,4 @@ jobs:
 
           EOF
 
-          # تشغيل السكربت الذي تم إنشاؤه
           python engineer_script.py
